@@ -1,0 +1,258 @@
+---
+title: "Cost-Volume-Profit(CVP)"
+bibliography: pricing.bib
+filters:
+   - lightbox
+lightbox: auto
+editor_options: 
+  chunk_output_type: console
+knitr:
+  opts_chunk: 
+    echo: true
+    waring: false
+    collapse: true
+    comment: "#>"  
+---
+
+
+# 개요
+
+원가-조업도-이익(Cost-Volume-Profit, CVP) 분석에서 **이익(Profit)**이 조업도(Volume), 원가(Cost)의 변화에 어떻게 변화하는지 분석하는 경영학 기법으로 이를 통해서 목표 이익, 목표판매량, 목표매출액 등을 산출해볼 수 있다. 특히, 손익분기점에 도달하려면 몇개의 상품을 팔아야하는지 분석할 수도 있다.
+
+원가는 고정비와 변동비로 구분하고 이익은 매출에서 비용을 제하면 구할 수고 조업도(Volume)는 기업의 활동정도로 제품 생산량, 노동시간, 기계작업시간 등으로 측정된다.
+
+- 구성요소
+    - 가격
+    - 판매량
+    - 단가(Unit Variable Cost)
+    - 총고정비(Total Fixed Cost)
+    - Product(Sales) Mix
+
+* 목표이익 = (가격 - 비용) X 목표판매량 - 총고정비용
+
+# 손익분기점 방법
+
+손익분기접(Break-Even)은 이익도 손해도 없는 상황으로 다양한 방식으로 계산을 할 수 있다.
+
+[출처: [@cafferky2010breakeven] ]{.aside}
+
+## 총비용 방법
+
+- 손익분기점: 총비용 = 총매출
+  - 총비용 = 고정비용 + 변동비용
+  - 총매출 = 판매량 X 단가
+
+
+```{r}
+library(tidyverse)
+library(testthat)
+
+fixed_costs    = 520000
+variable_costs = 1105000
+total_costs    = 1625000
+
+test_that("총원가 = 고정비 + 변동비", {
+  expect_equal(fixed_costs + variable_costs, total_costs)
+})
+
+total_costs <- fixed_costs + variable_costs
+total_revenue = 1625000
+
+test_that("총매출 - 총원가 = 0", {
+  expect_equal(total_revenue - total_costs, 0)
+})
+```
+  
+  
+## 공헌이익 방법
+
+공헌이익(Contribution Margin)은 제품가에서 변동비를 뺀 값으로 다음과 같이 표현한다.
+
+$$\text{(단위) 공헌이익 =  단위 가격 - 단위 변동비}$$
+
+- 고정비: 520,000
+- 단위 가격: 25
+- 단위 변동비: 17
+- (단위) 공헌이익: (25-17) = 8
+
+
+문제는 판매량이 얼마가 되어야 최소 손실을 보지 않게 될까?
+수식으로 표현하면 다음과 같이 구할 수 있다.
+
+$520,000 - (25-17) * volume = 0$
+
+방정식을 풀면 다음과 같이 구할 수 있다.
+
+$volume = \frac{520,000}{8} = 65,000$
+
+```{r}
+sales_fn <- function(volume) (25-17) * volume - 520000
+
+be_volume <- uniroot(sales_fn, lower = 0, upper = 100000)$root
+be_volume
+```
+
+시각적으로 나타내면 다음과 같다.
+
+```{r}
+tibble(volume = seq(0, 100000, 100)) %>% 
+  mutate(profit = map_dbl(volume, sales_fn)) %>% 
+  ggplot(aes(x = volume, y = profit)) +
+    geom_line() +
+    scale_x_continuous(labels = scales::comma) +
+    scale_y_continuous(labels = scales::comma) +
+    theme_bw(base_family = "NanumGothic") +
+  labs(title = "손익분기점 판매량 - 공헌이익 방법",
+       x = "판매량",
+       y = "이익") +
+    geom_hline(yintercept = 0, color = "gray50") +
+    geom_point(aes(x= be_volume, y = 0), size = 3, color = "blue") +
+    annotate("text", x = 80000, y = -50000, 
+             label = glue::glue("손익분기점: {scales::comma(be_volume)}"), 
+             size = 5, color = "blue")  
+  
+```
+
+## 목표 이익 방법
+
+
+손익분기점에 맞추는 것이 목표가 아니고 사업에서는 이익을 남기는 것이 목표라서 다음과 같이 목표 이익을 더하여 목표이익을 달성하는데 필요한 판매수량을 계산한다.
+
+예를 들어 고정비(즉, 투자)의 10%를 목표로 삼아 목표달성을 위해 필요한 판매량을 계산해보자.
+
+
+$$\text{목표이익 달성을 위한 판매수량} = \frac{고정비용+목표이익}{(단위) 공헌이익}$$
+
+- 고정비: 520,000
+- 단위 가격: 25
+- 단위 변동비: 17
+- (단위) 공헌이익: (25-17) = 8
+- 목표이익: 52,000
+
+수식으로 정리하여 방정식을 풀면 판매량을 다음과 같이 계산할 수 있다.
+
+
+$$\frac{520,000 + 52,000}{8} = 71,500$$
+
+이것을 확대하면 다른 사항도 고려하여 목표를 달성하는데 필요한 판매목표수량을 계산할 수 있다.
+
+
+- 고정비: 520,000
+- 단위 가격: 25
+- 단위 변동비: 17
+- (단위) 공헌이익: (25-17) = 8
+- 이익관련 전체 목표
+    - 목표이익: 52,000
+    - 우선주 배당: 13,000
+    - 일반주 배당: 20,000
+
+$$\frac{520,000 + 52,000 + 13,000 + 20,000}{8} = 75,625$$
+    
+프로그래밍을 통해 다음과 같이 계산할 수 있다.
+
+```{r}
+fixed_costs = 520000
+desired_profit = 52000
+dividends_prefer = 13000
+dividends_common = 20000
+
+contribution_margin = (25-17)
+
+cm_be_volume <- (fixed_costs + desired_profit + dividends_prefer + dividends_common) / contribution_margin
+
+test_that("목표이익 검정", {
+  expect_equal(cm_be_volume, 75625)
+})
+```
+
+시각화를 통해서 상기 사항을 다음과 같이 확인할 수 있다.
+
+```{r}
+# 고정비, 목표이익, 배당 함수 --------
+fixed_cost_fn <- function(volume) (25-17) * volume - 520000
+desired_profit_fn <- function(volume) (25-17) * volume - 520000 - 52000
+dividend_fn <- function(volume) (25-17) * volume - 520000 - 52000 - 13000 - 20000
+
+# 시각화를 위한 데이터프레임
+goals_tbl <- tibble(volume = seq(0, 100000, 100)) %>% 
+  mutate(fixed_cost    = map_dbl(volume, fixed_cost_fn),
+         desired_profit = map_dbl(volume, desired_profit_fn),
+         dividend       = map_dbl(volume, dividend_fn)) %>% 
+  pivot_longer(fixed_cost:dividend) %>% 
+  mutate(name = factor(name, levels = c("fixed_cost",
+                                        "desired_profit",
+                                        "dividend"),
+                       labels = c("고정비", "목표이익", "배당")))
+
+
+fixed_cost_bep <- uniroot(fixed_cost_fn, lower = 0, upper = 100000)$root
+desired_profit_bep <- uniroot(desired_profit_fn, lower = 0, upper = 100000)$root
+dividend_bep <- uniroot(dividend_fn, lower = 0, upper = 100000)$root
+
+# 시각화
+goals_tbl %>% 
+  ggplot(aes(x = volume, y = value, color = name)) +
+    geom_line() +
+    scale_x_continuous(labels = scales::comma) +
+    scale_y_continuous(labels = scales::comma) +
+    theme_bw(base_family = "NanumGothic") +
+  labs(title = "손익분기점 판매량 - 목표이익달성",
+       x = "판매량",
+       y = "이익",
+       color = "구분") +
+    geom_hline(yintercept = 0, color = "gray50") +
+    geom_point(aes(x= fixed_cost_bep, y = 0), size = 3, color = "blue") +
+    geom_point(aes(x= desired_profit_bep, y = 0), size = 3, color = "green") +
+    geom_point(aes(x= dividend_bep, y = 0), size = 3, color = "red") +
+    annotate("text", x = 55000, y = 50000, 
+             label = glue::glue("{scales::comma(fixed_cost_bep)}"), 
+             size = 4.5, color = "blue") +
+    annotate("text", x = 85000, y = 30000, 
+             label = glue::glue("{scales::comma(desired_profit_bep)}"), 
+             size = 4.5, color = "green") +
+    annotate("text", x = 85000, y = -50000, 
+             label = glue::glue("{scales::comma(dividend_bep)}"), 
+             size = 4.5, color = "red") +
+  scale_color_manual(values = c("blue", "green", "red")) 
+
+```
+
+    
+# 고정비와 변동비 구분
+
+고정비와 변동비를 구분할 수 있으면 순익분기점을 추정하는데 큰 도움이 된다. 
+대표적인 방법으로 선형회귀식을 통해 고정비와 변동비를 추정할 수 있다.
+
+선형회귀식을 계산하는데 필요한 것이 데이터다. 만약, 판매량과 총비용에 대한 데이터가 관측점별로 준비되어 있다면 이를 활용하여 상대적으로 데이터에 기반하여 고정비와 변동비를 정확히 도출할 수 있다. 즉, 연도별 총비용 데이터와 판매량 데이터를 통해 고정비와 변동비를 선형회귀모형을 통해 추정할 수 있다.
+
+$$Y_{총비용} = \alpha_{고정비용} + \beta_{변동비} \times 판매량$$
+
+```{r}
+library(tidyverse)
+library(broom)
+
+cost_tbl <- tribble(~"연도", ~ "판매량", ~"총비용",
+                    2010, 160, 2700,
+                    2011, 170, 2795,
+                    2012, 150, 2610,
+                    2013, 140, 2500,
+                    2014, 180, 2800)
+
+cost_lm <- lm(총비용 ~ 판매량, data = cost_tbl)
+  
+coef_tbl <- broom::tidy(cost_lm)
+
+fixed_cost_intercept <- coef_tbl %>% filter(term == "(Intercept)") %>% pull(estimate)
+
+variable_cost_slope <- coef_tbl %>% filter(term == "판매량") %>% pull(estimate)
+```
+
+
+상기 데이터를 통해 해당 기업 변동비와 고정비를 추정하면 다음과 같다.
+
+$$Y_{총비용} = `r scales::comma(fixed_cost_intercept)` + `r variable_cost_slope` \times 판매량$$
+
+- 고정비용: `r scales::comma(fixed_cost_intercept)`
+- 변동비용: `r variable_cost_slope`
+
+

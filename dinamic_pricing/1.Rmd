@@ -1,0 +1,407 @@
+---
+title: "가격 중요성"
+filters:
+   - lightbox
+lightbox: auto
+editor_options: 
+  chunk_output_type: console
+knitr:
+  opts_chunk: 
+    echo: true
+    waring: false
+    collapse: true
+    comment: "#>"
+---
+
+**가격(Price)**은 판매자가 판매하고 있는 제품과 서비스 가치를 반영하기에 적정 가격을 넘어 사업 목표를 달성할 수 있는 최적 가격을 제시하는 것이 매우 중요하다. 특히 가격은 **기업의 사업목표**를 달성하는 요소 중 가장 강력한 **정책수단**으로 인식되고 있다. 
+
+**가격 결정요인**으로 **소비자**가 지불하고자 하는 가격은 가격의 상한을 설정하고 반대로 **원가**는 지속적인 생존과 성장을 위해 손해를 최소로 해야 하기 때문에 하한을 설정한다. 큰 틀에서 보면 원가와 고객이 중요하지만 이외에도 경쟁회사 가격, 유통경로와 납품구조, 정부 규제도 영향을 미친다.
+
+
+# 가격 설정 방법
+
+가격 결정방법은 다양한 방식이 존재한다. 예를 들어, 원가를 중시하여 결정을 하는 방식부터 고객과 가치를 핵심으로 두고 결정하는 방식, 시장상황을 반영하여 결정하는 방식 등 다양하다.
+
+- 비용+$\alpha$ 방식 가격결정 방식: 비용 + 이익
+- 시장가 기준 가격결정 : 경쟁자 고려 가격 설정
+- 고객 중심 가격결정: 고객을 최우선 고려하여 가격 결정
+- 가치 중심 가격결정: 고객이 제품이과 서비스에 두는 가치를 근간으로 가격결정
+
+
+# 가격과 수요
+
+커피숖을 운영한다고 가정하자. 과거 경험에서 다음과 같은 경험치를 데이터를 통해 얻었다고 하면 이를 시각화하는 것은 어렵지 않을 것이다. 즉, 커피값이 1,000 원에서는 판매가 많지만 5,000원 넘어가면 판매가 거의 없고 대략 2,000원 전후로 가장 많은 수요가 있다는 것을 확인할 수 있다.
+  
+```{r}
+#| warning: false
+library(tidyverse)
+library(gt)
+
+pricing_tbl <- 
+  tribble( ~ "접근방식",  ~"중시", ~"무시",    ~"지지부서",
+           "비용+",       "비용", "경쟁, 고객", "재무",
+           "시장가 기반", "경쟁", "비용, 고객", "영업",
+           "가치 기반",   "고객", "비용, 경쟁", "마케팅") 
+
+pricing_tbl %>% 
+  gt() %>% 
+    cols_align(
+      align = "center",
+      columns = everything()
+    )  %>% 
+    tab_style(
+      style = cell_text(size = px(17)),
+      locations = cells_body(
+        columns = everything()
+      )
+    )  
+```
+  
+  
+  
+
+```{r}
+#| warning: false
+library(tidyverse)
+library(showtext)
+library(patchwork)
+
+font_add_google("Nanum Gothic", "NanumGothic")
+
+showtext_auto()
+
+windows()
+
+## 1. 데이터 -------------
+coffee_tbl <- tribble(~"가격", ~"수요",
+                      1000, 120,
+                      2000, 80,
+                      3000, 40,
+                      4000, 20)
+
+## 2. 수요와 가격 -------------
+coffee_price_g <- coffee_tbl %>% 
+  ggplot(aes(x = 가격, y = 수요, 
+             ymax = 수요, ymin = 0)) +
+    geom_point(size = 3) +
+    geom_pointrange(color = "gray50", linetype = 2) +
+    expand_limits(x = 0, y = 0) +
+    scale_x_continuous(expand = expansion(mult = c(0, .1)),
+                       labels = scales::comma,
+                       limits = c(0, 5000)) +
+    scale_y_continuous(breaks=seq(0, 150, 20),
+                       expand = expansion(mult = c(0, .1))) +
+    theme_bw(base_family = "NanumGothic") +
+    labs(x = "가격(원)",
+         y = "커피 수요(판매량)",
+         title = "커피 판매가격과 수요량 관계")  
+
+## 3. 매출 -------------
+coffee_revenue_g <- coffee_tbl %>% 
+  mutate( 매출 = (가격 * 수요) / 10^4) %>% 
+  # mutate(가격 = as.factor(가격)) %>% 
+  ggplot(aes( x = 가격, y = 매출)) +
+    geom_col(fill = "skyblue", width = 200) +
+    scale_x_continuous(expand = expansion(mult = c(0, .1)),
+                       labels = scales::comma,
+                       limits = c(0, 5000)) +
+    theme_bw(base_family = "NanumGothic") +
+    labs(x = "커피 가격",
+         y = "매출(만원)",
+         title = "커피 판매가격과 수요량 관계")  
+
+coffee_price_g / coffee_revenue_g
+```
+
+
+# 수요공급 곡선
+
+[econocharts package](https://github.com/R-CoderDotCom/econocharts)를 사용해서 수월히 수요공급을 통한 가격 결정상황을 시각적으로 표현할 수 있다. 공급이 가격의 변화에 따라 직선이 아니지만 개념적으로 공급이 고정된 상황에서 수요가 늘어나게 되면 가격은 자연히 높아지게 된다.
+
+```{r}
+# devtools::install_github("R-CoderDotCom/econocharts")
+library(econocharts)
+library(tidyverse)
+
+supply_tbl     <- data.frame(x = c(1, 9), y = c(1, 9))
+
+demand_tbl     <- data.frame(x = c(7, 1), y = c(1, 7))
+new_demand_tbl <- data.frame(x = c(9, 1), y = c(1, 9))
+
+sdcurve_g <- sdcurve(supply_tbl, 
+                     demand_tbl,
+                     supply_tbl, 
+                     new_demand_tbl,
+                     names = c("S[1]", "D[현재]","S[1]", "D[신규]"),  
+                     equilibrium = TRUE) +
+  annotate("segment", x = 1.1, xend = 2.8, y = 7, yend = 7, 
+           arrow = arrow(length = unit(0.3, "lines")), colour = "grey50") +
+  annotate("segment", x = 1, xend = 1, y = 4.1, yend = 4.9,               
+           arrow = arrow(length = unit(0.3, "lines")), colour = "grey50") +
+  annotate("segment", x = 4.1, xend = 4.9, y = 1, yend = 1,               
+           arrow = arrow(length = unit(0.3, "lines")), colour = "grey50") +  
+  labs(title = "수요 증가에 따른 가격과 공급량 변화",
+       x = "공급",
+       y = "가격") +
+  theme_bw(base_family = "NanumGothic")    
+
+sdcurve_g
+
+```
+
+# 가격차별 이유
+
+가격과 수요물량에 대한 정보를 갖고 있는 상황에서 가격을 달리하여 매출과 순이익 변화를 살펴보자. 이를 통해서 적절한 가격결정과 가격정책의 중요성을 음미해보자.
+
+:::{.callout-warning}
+### TL;DR (Too Long; Didn't Read)
+
+동일한 제품과 서비스에 가격을 달리하면 이익을 높일 수 있다.
+:::
+
+## 데이터
+
+[The Incremental Contribution from Segmented Price Structure [@nagle2017strategy]]{.aside}
+
+고객군을 분리하지 않은 단일 가격을 지정할 때, 고객군을 두개로 분리하여 가격을 2개 달리하여 책정할 때, 마지막으로 고객군을 5개로 세분화할 경우 발생되는 총이익을 살펴보자.
+
+- 고정비: 3가지 가격정책 모두 동일함 가정
+- 변동비: 5
+
+```{r data}
+library(tidyverse)
+library(ggforce)
+
+segment_tbl <- tibble( x = c(50, 
+                             50+150, 
+                             50+150+350, 
+                             50+150+350+250,
+                             50+150+350+250+200),
+                       y = c(20, 15, 10, 8, 6))
+
+segment_tbl %>% 
+  ggplot(aes(x = x, y = y)) +
+    geom_point() +
+    labs(x = "수요물량",
+         y = "가격",
+         title = "가격과 수요물량 관계") +
+     geom_hline(yintercept = 5, linetype = 2, color = "gray70") +
+     expand_limits(x =0, y =0) +
+     theme_bw(base_family = "NanumGothic") +
+     annotate("text", x = 1, y = 6, label = "변동비", size = 3)
+```
+
+
+
+## 5개 가격
+
+```{r five-profit}
+five_price_profit <- segment_tbl %>% 
+  mutate(lag_x = lag(x)) %>% 
+  mutate(수요물량 = ifelse(is.na(lag_x), x, x - lag_x)) %>% 
+  rename("가격" = y) %>% 
+  mutate(공헌이익 = 가격 - 5) %>%  # 변동비용 제외
+  mutate(이익 = 수요물량 * 공헌이익) %>% 
+  summarise(총이익 = sum(이익)) %>% 
+  pull(총이익)
+
+five_price_profit
+```
+
+서로 다른 가격정책을 5개 달리하게 되면 다음과 같이 `r scales::comma(five_price_profit)` 을 얻게되어 가장 많은 이익을 남기게 된다.
+
+
+```{r five-price}
+library(ggrepel)
+
+five_price_g <- segment_tbl %>% 
+  ggplot(aes(x = x, y = y)) +
+    expand_limits(x =0, y =0) +
+    geom_point(color = "red") +
+    geom_rect(aes(xmin = 0, xmax = 50, 
+                  ymin = 0, ymax = 20), fill = "gray50") +
+    geom_rect(aes(xmin = 50, xmax = 50 + 150, 
+                  ymin = 0, ymax = 15), fill = "gray60") +
+    geom_rect(aes(xmin = 50 + 150, xmax = 50 + 150 + 350, 
+                  ymin = 0, ymax = 10), fill = "gray70") +
+    geom_rect(aes(xmin = 50 + 150 + 350, xmax = 50 + 150 + 350 + 250, 
+                  ymin = 0, ymax = 8), fill = "gray80") +
+    geom_rect(aes(xmin = 50 + 150 + 350 +250, xmax = 50 + 150 + 350 + 250 +200, 
+                  ymin = 0, ymax = 6), fill = "gray90")  +
+  ## 변동비 ------------
+    geom_rect(aes(xmin = 0, xmax = 50 + 150 + 350 + 250 +200, 
+                  ymin = 0, ymax = 5), fill = "white", alpha = 0.1, color = "blue", linetype = "dashed")  +
+    labs(x = "수요물량",
+         y = "가격",
+         title = "가격과 수요물량 관계: 서로 다른 5개 가격") +
+     geom_hline(yintercept = 5, linetype = 2, color = "gray70") +
+     expand_limits(x =0, y =0) +
+     theme_bw(base_family = "NanumGothic") +
+     annotate("text", x = 20, y = 6, label = "변동비($5)", size = 3)  +
+     scale_x_continuous(labels = scales::comma,
+                        breaks = c(0, 50, 50+150, 50+150+350, 50+150+350+250, 50+150+350+250+200)) +
+    geom_text_repel(aes(x = x, y =y, label = glue::glue("가격:{x}\n물량:{y}"))) +
+    annotate("text", x = 500, y = 15, 
+             label = glue::glue("총이익: {scales::comma(five_price_profit)}"),
+             size = 5,
+             color = "red")  
+
+five_price_g
+```
+
+
+
+
+
+## 2개 가격
+
+```{r}
+two_price_profit <- segment_tbl %>% 
+  mutate(lag_x = lag(x)) %>% 
+  mutate(수요물량 = ifelse(is.na(lag_x), x, x - lag_x)) %>% 
+  rename("가격" = y) %>% 
+  mutate(공헌이익 = 가격 - 5) %>%  # 변동비용 제외
+  select(가격, 공헌이익, 수요물량) %>% 
+  mutate(가격정책 = case_when(가격 %in% c(20, 15) ~ "고가", 
+                              가격 %in% c(10, 8)  ~ "중가", 
+                              TRUE ~ "저가")) %>% 
+  filter(가격정책 != "저가") %>% 
+  group_by(가격정책) %>% 
+  summarise(물량 = sum(수요물량),
+            공헌이익 = min(공헌이익)) %>% 
+  mutate(이익 = 물량 * 공헌이익) %>% 
+  summarise(총이익 = sum(이익)) %>% 
+  pull(총이익)
+
+two_price_profit
+```
+
+서로 다른 가격정책을 2개로 달리하게 되면 다음과 같이 `r scales::comma(two_price_profit)` 을 얻게 되어 중간 정도 이익을 남기게 된다.
+
+
+```{r two-price}
+library(ggrepel)
+
+two_price_g <- segment_tbl %>% 
+  mutate(color = ifelse(y %in% c(15,8), "red", "black")) %>% 
+  ggplot(aes(x = x, y = y)) +
+    expand_limits(x =0, y =0) +
+    geom_point(aes(color = color)) +
+    geom_rect(aes(xmin = 0, xmax = 50, 
+                  ymin = 0, ymax = 20), 
+              alpha = 0.0, color = "black", linetype = "dashed") +
+    geom_rect(aes(xmin = 0, xmax = 50 + 150, 
+                  ymin = 0, ymax = 15), fill = "gray60") +
+    geom_rect(aes(xmin = 50 + 150, xmax = 50 + 150 + 350, 
+                  ymin = 0, ymax = 10), 
+              alpha = 0.0, color = "black", linetype = "dashed") +
+    geom_rect(aes(xmin = 50 + 150, xmax = 50 + 150 + 350 + 250, 
+                  ymin = 0, ymax = 8), fill = "gray80") +
+    geom_rect(aes(xmin = 50 + 150 + 350 +250, xmax = 50 + 150 + 350 + 250 +200, 
+                  ymin = 0, ymax = 6), 
+              alpha = 0.0, color = "black", linetype = "dashed") +
+    ## 변동비 -------
+    geom_rect(aes(xmin = 0, xmax = 50 + 150 + 350 + 250 +200, 
+                  ymin = 0, ymax = 5), fill = "white", alpha = 0.1, color = "blue", linetype = "dashed")  +
+    labs(x = "수요물량",
+         y = "가격",
+         title = "가격과 수요물량 관계: 서로 다른 2개 가격") +
+     geom_hline(yintercept = 5, linetype = 2, color = "gray70") +
+     expand_limits(x =0, y =0) +
+     theme_bw(base_family = "NanumGothic") +
+     annotate("text", x = 20, y = 6, label = "변동비($5)", size = 3)  +
+     scale_x_continuous(labels = scales::comma,
+                        breaks = c(0, 50, 50+150, 50+150+350, 50+150+350+250, 50+150+350+250+200)) +
+    geom_text_repel(aes(x = x, y =y, label = glue::glue("가격:{x}\n물량:{y}"))) +
+    scale_color_manual(values = c("black" = "black", "red" = "red")) +
+    theme(legend.position = "none")  +
+    annotate("text", x = 500, y = 15, 
+           label = glue::glue("총이익: {scales::comma(two_price_profit)}"),
+           size = 5,
+           color = "red")
+
+two_price_g
+```
+
+
+## 1물 1가
+
+```{r}
+one_price_profit <- segment_tbl %>% 
+  mutate(lag_x = lag(x)) %>% 
+  mutate(수요물량 = ifelse(is.na(lag_x), x, x - lag_x)) %>% 
+  rename("가격" = y) %>% 
+  mutate(공헌이익 = 가격 - 5) %>%  # 변동비용 제외
+  filter(가격 >= 10) %>% 
+  summarise(물량 = sum(수요물량)) %>% 
+  mutate(총이익 = 물량 * 5) %>% 
+  pull(총이익)
+
+one_price_profit
+```
+
+서로 다른 가격정책을 1개로 통일하면 다음과 같이 `r scales::comma(one_price_profit)` 을 얻게되어 가장 적은 이익을 남기게 된다.
+
+
+```{r}
+one_price_g <- segment_tbl %>% 
+  mutate(color = ifelse(y == 10, "red", "black")) %>% 
+  ggplot(aes(x = x, y = y)) +
+    expand_limits(x =0, y =0) +
+    geom_point(aes(color = color)) +
+    geom_rect(aes(xmin = 0, xmax = 50, 
+                  ymin = 0, ymax = 20), 
+              alpha = 0.0, color = "black", linetype = "dashed") +
+    geom_rect(aes(xmin = 50, xmax = 50 + 150, 
+                  ymin = 0, ymax = 15), 
+              alpha = 0.0, color = "black", linetype = "dashed") +
+    geom_rect(aes(xmin = 0, xmax = 50 + 150 + 350, 
+                  ymin = 0, ymax = 10), fill = "gray50") +
+    geom_rect(aes(xmin = 50 + 150 +350, xmax = 50 + 150 + 350 + 250, 
+                  ymin = 0, ymax = 8),
+              alpha = 0.0, color = "black", linetype = "dashed") +
+    geom_rect(aes(xmin = 50 + 150 + 350 +250, xmax = 50 + 150 + 350 + 250 +200, 
+                  ymin = 0, ymax = 6), 
+              alpha = 0.0, color = "black", linetype = "dashed") +
+    ## 변동비 -------
+    geom_rect(aes(xmin = 0, xmax = 50 + 150 + 350 + 250 +200, 
+                  ymin = 0, ymax = 5), fill = "white", alpha = 0.1, color = "blue", linetype = "dashed")  +
+    labs(x = "수요물량",
+         y = "가격",
+         title = "가격과 수요물량 관계: 1 가격") +
+     geom_hline(yintercept = 5, linetype = 2, color = "gray70") +
+     expand_limits(x =0, y =0) +
+     theme_bw(base_family = "NanumGothic") +
+     annotate("text", x = 20, y = 6, label = "변동비($5)", size = 3)  +
+     scale_x_continuous(labels = scales::comma,
+                        breaks = c(0, 50, 50+150, 50+150+350, 50+150+350+250, 50+150+350+250+200)) +
+    geom_text_repel(aes(x = x, y =y, label = glue::glue("가격:{x}\n물량:{y}"))) +
+    scale_color_manual(values = c("black" = "black", "red" = "red")) +
+    theme(legend.position = "none") +
+    annotate("text", x =500, y = 15, 
+             label = glue::glue("총이익: {scales::comma(one_price_profit)}"),
+             size = 5,
+             color = "red")
+
+one_price_g
+```
+
+
+## 가격정책 비교
+
+::: {#fig-price layout-ncol=3}
+
+```{r}
+one_price_g 
+```
+
+```{r}
+two_price_g
+```
+
+```{r}
+five_price_g 
+```
+
+서로 다른 3가지 가격정책 비교
+:::
